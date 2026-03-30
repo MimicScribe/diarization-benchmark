@@ -184,7 +184,44 @@ def score_corpus(
     return result
 
 
-def render_readme(results: list[CorpusResult], results_dir: Path) -> None:
+def _score_baseline(
+    corpus: str,
+    data_dir: Path,
+    baseline_dir: Path,
+    collar: float = 0.25,
+) -> CorpusResult:
+    """Score pyannote baseline RTTMs (flat directory, not per-corpus subdirs)."""
+    ref_dir = data_dir / corpus / "rttm"
+    hyp_dir = baseline_dir / "rttm"
+    uem_dir = data_dir / corpus / "uem"
+
+    result = CorpusResult(corpus=corpus)
+    if not ref_dir.exists() or not hyp_dir.exists():
+        return result
+
+    for ref_path in sorted(ref_dir.glob("*.rttm")):
+        file_id = ref_path.stem
+        hyp_path = hyp_dir / f"{file_id}.rttm"
+        if not hyp_path.exists():
+            continue
+        uem_path = uem_dir / f"{file_id}.uem"
+        file_result = score_file(ref_path, hyp_path, uem_path, collar=collar)
+        result.files.append(file_result)
+
+    if result.files:
+        print(
+            f"  Pyannote baseline {corpus}: DER={result.aggregate_der:.1%}"
+            f" — {len(result.files)} files"
+        )
+
+    return result
+
+
+def render_readme(
+    results: list[CorpusResult],
+    results_dir: Path,
+    baseline_results: list[CorpusResult] | None = None,
+) -> None:
     """Render results as a markdown table and save to results/."""
     from datetime import date
 
@@ -236,29 +273,72 @@ def render_readme(results: list[CorpusResult], results_dir: Path) -> None:
             f"| {r.aggregate_confusion:.1%} |"
         )
 
+    # Baseline comparison
+    baselines = baseline_results or []
+    has_baseline = any(b.files for b in baselines)
+    if has_baseline:
+        lines.extend([
+            "",
+            "## Baseline Comparison",
+            "",
+            "[Pyannote Community-1](https://huggingface.co/pyannote/speaker-diarization-community-1)"
+            " is the reference open-source diarization system, run with default parameters.",
+            "",
+            "| Corpus | Pyannote Community-1 | MimicScribe Pipeline |",
+            "|--------|--------------------:|--------------------:|",
+        ])
+        for r, b in zip(results, baselines):
+            if not r.files:
+                continue
+            b_der = f"{b.aggregate_der:.1%}" if b.files else "—"
+            lines.append(f"| {r.corpus} | {b_der} | {r.aggregate_der:.1%} |")
+
     lines.append("")
     lines.append("## Per-File Results")
 
-    for r in results:
+    for i, r in enumerate(results):
         if not r.files:
             continue
-        lines.extend([
-            "",
-            f"### {r.corpus}",
-            "",
-            "| File | DER | Missed | False Alarm | Confusion | Ref Spk | Hyp Spk |",
-            "|------|----:|-------:|------------:|----------:|--------:|--------:|",
-        ])
-        for f in sorted(r.files, key=lambda x: x.file_id):
-            lines.append(
-                f"| {f.file_id} "
-                f"| {f.der:.1%} "
-                f"| {f.missed:.1%} "
-                f"| {f.false_alarm:.1%} "
-                f"| {f.confusion:.1%} "
-                f"| {f.n_ref_speakers} "
-                f"| {f.n_hyp_speakers} |"
-            )
+        b = baselines[i] if i < len(baselines) else CorpusResult(corpus=r.corpus)
+        b_lookup = {f.file_id: f for f in b.files} if b.files else {}
+        has_b = bool(b_lookup)
+
+        if has_b:
+            lines.extend([
+                "",
+                f"### {r.corpus}",
+                "",
+                "| File | Pyannote C1 | MimicScribe | Ref Spk | Hyp Spk |",
+                "|------|------------:|------------:|--------:|--------:|",
+            ])
+            for f in sorted(r.files, key=lambda x: x.file_id):
+                bf = b_lookup.get(f.file_id)
+                b_der = f"{bf.der:.1%}" if bf else "—"
+                lines.append(
+                    f"| {f.file_id} "
+                    f"| {b_der} "
+                    f"| {f.der:.1%} "
+                    f"| {f.n_ref_speakers} "
+                    f"| {f.n_hyp_speakers} |"
+                )
+        else:
+            lines.extend([
+                "",
+                f"### {r.corpus}",
+                "",
+                "| File | DER | Missed | False Alarm | Confusion | Ref Spk | Hyp Spk |",
+                "|------|----:|-------:|------------:|----------:|--------:|--------:|",
+            ])
+            for f in sorted(r.files, key=lambda x: x.file_id):
+                lines.append(
+                    f"| {f.file_id} "
+                    f"| {f.der:.1%} "
+                    f"| {f.missed:.1%} "
+                    f"| {f.false_alarm:.1%} "
+                    f"| {f.confusion:.1%} "
+                    f"| {f.n_ref_speakers} "
+                    f"| {f.n_hyp_speakers} |"
+                )
 
     lines.append("")
 
@@ -313,11 +393,21 @@ def main():
 
     corpora = ["ami", "earnings21"] if args.corpus == "all" else [args.corpus]
     results = []
+    baseline_results = []
+    baseline_dir = args.output_dir / "pyannote-community-1"
     for corpus in corpora:
         result = score_corpus(corpus, args.data_dir, args.output_dir, collar=args.collar)
         results.append(result)
 
-    render_readme(results, args.results_dir)
+        # Score pyannote baseline if available
+        baseline_hyp_dir = baseline_dir / "rttm"
+        if baseline_hyp_dir.exists() and list(baseline_hyp_dir.glob("*.rttm")):
+            baseline = _score_baseline(corpus, args.data_dir, baseline_dir, collar=args.collar)
+            baseline_results.append(baseline)
+        else:
+            baseline_results.append(CorpusResult(corpus=corpus))
+
+    render_readme(results, args.results_dir, baseline_results=baseline_results)
     print("\nDone.")
 
 
