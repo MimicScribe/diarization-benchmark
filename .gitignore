@@ -1,0 +1,14 @@
+# Downloaded corpus data
+data/
+
+# Pipeline outputs
+output/
+
+# Proprietary prompt (not distributed — see AGENTS.md)
+attribution_prompt.txt
+
+# Python
+__pycache__/
+*.egg-info/
+dist/
+.venv/

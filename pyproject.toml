@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mimicscribe-bench"
+version = "0.1.0"
+description = "Diarization benchmark for MimicScribe meeting transcription pipeline"
+requires-python = ">=3.10"
+dependencies = [
+    "meeteval>=0.4",
+    "pyannote.metrics>=3.2",
+    "pyannote.core>=5.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["ruff", "pytest"]
+
+[project.scripts]
+bench-download = "mimicscribe_bench.download:main"
+bench-run = "mimicscribe_bench.run_pipeline:main"
+bench-score = "mimicscribe_bench.score:main"
+bench-all = "mimicscribe_bench.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
