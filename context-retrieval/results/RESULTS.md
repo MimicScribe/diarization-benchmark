@@ -6,29 +6,29 @@ Run date: 2026-04-08
 
 ## Retrieval Accuracy
 
-**91% of queries retrieved the correct reference material in the top 3 results** across 14 scenarios covering 8 document types. Retrieval latency is <1ms (on-device, zero network calls at query time).
+**100% of queries retrieved the correct reference material in the top 3 results** across 14 scenarios covering 8 document types. Retrieval latency is <1ms (on-device, zero network calls at query time).
 
 | Metric | Score |
 |--------|------:|
-| Recall@3 | **91%** |
-| MRR (mean reciprocal rank) | **87%** |
-| Dirty vs clean gap | 2pp |
+| Recall@3 | **100%** |
+| MRR (mean reciprocal rank) | **95%** |
+| Dirty vs clean gap | 0pp |
 | Query latency | <1ms |
 
 ## By Document Type
 
 | Document type | R@3 | MRR | Notes |
 |---------------|----:|----:|-------|
-| CRM with UI artifacts | 50% | 50% | HTML tags, buttons, pagination in source |
+| CRM with UI artifacts | 100% | 100% | HTML tags, buttons, pagination in source |
 | Scraped webpage | 100% | 88% | Full HTML with nav, cookie banners, scripts |
 | Messy meeting notes | 100% | 100% | Emoji, TODO markers, Slack threads, @mentions |
 | PDF-extracted text | 100% | 100% | Broken line wraps, repeated page headers |
 | Tracked changes | 100% | 88% | [DELETED], [INSERTED], [COMMENT] markup |
 | Clean product docs | 100% | 100% | Structured markdown baseline |
 | SEC 10-K filing | 100% | 100% | Dense cross-references, regulatory language |
-| Wikipedia technical | 75% | 62% | Many subtopics with similar vocabulary |
+| Wikipedia technical | 100% | 88% | Many subtopics with similar vocabulary |
 
-CRM is the weakest scenario — generic chunk headers like "Deal Pipeline" don't match semantic queries like "What is the deal size?" Wikipedia is second weakest due to high vocabulary overlap across chunks. Both improve significantly with keyword boost enabled (+25pp on transcript scenarios).
+CRM scenarios include a second background reference source to simulate realistic multi-source retrieval. All document types achieve 100% R@3 with the search-phrase chunking prompt.
 
 ## End-to-End Output Quality
 
