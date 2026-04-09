@@ -2,7 +2,7 @@
 
 Evaluates the real-time meeting assistant briefing system in [MimicScribe](https://mimicscribe.app). The assistant generates talking points, action items, question detection, and interpersonal awareness suggestions during live meetings.
 
-59 scenarios are run 3 times each against the production prompt. Each run is scored by a combination of deterministic assertions and LLM-as-judge (Claude Sonnet) semantic evaluation.
+96 scenarios are run 5 times each against the production prompt. Each run is scored by a combination of deterministic assertions and LLM-as-judge (Claude Sonnet) semantic evaluation.
 
 ## Models
 
@@ -51,6 +51,22 @@ Incremental scenarios (9 of 13) test the `<PREVIOUS_ACTION_ITEMS>` mechanic:
 
 Only questions from remote speakers are surfaced. Questions asked by the user are excluded. A question is considered answered if any subsequent speaker addresses it. Tests unanswered questions, answered questions, multi-party answers, rhetorical questions, and deflection.
 
+### Interview Depth (5 scenarios)
+
+Tests whether the assistant suggests follow-up questions that probe deeper into candidate responses — clarifying vague claims, testing technical depth, exploring specifics behind generalizations, or digging into behavioral examples. Includes system design interviews where candidates give textbook answers without failure modes, behavioral rounds where candidates deflect on conflict or give vague impact claims, and collaboration assessments where candidates default to solo execution.
+
+### Standup & Blocker Ownership (4 scenarios)
+
+Tests detection of unowned blockers and stalled handoffs in standup meetings. Multi-blocker scenarios with a mix of owned and unowned items verify the assistant flags the right things (unassigned tickets, unclaimed requests) while not flagging items that clearly have owners and are progressing. Includes edge cases where everything is on track and minimal talking points are expected.
+
+### Customer Workaround Detection (3 scenarios)
+
+Tests detection of workarounds (manual processes, custom scripts, spreadsheet hacks) and unexpressed needs in customer calls. Long transcripts where customers describe elaborate workarounds as normal ("we just do X") rather than as problems. Includes a frustrated customer masking pain behind "it's fine," an elaborate ETL pipeline workaround blocking three initiatives, and a happy customer with a buried single-point-of-failure dependency.
+
+### Presentation Coverage Tracking (4 scenarios)
+
+Tests whether the assistant tracks prepared talking points and surfaces uncovered ones during presentations. The user lists key points in their prepared context, then delivers some but not all during the talk. The assistant should surface remaining points without re-surfacing covered ones. Includes mid-talk coverage, audience Q&A handling, all-points-covered edge case, and dense financial metrics with number preservation.
+
 ### Complex Scenarios (7 scenarios)
 
 Long domain-specific transcripts with jargon (enterprise sales, sprint planning, board meetings, QBR). Tests hallucination (no fabricated names/numbers), forward-looking talking points (not recaps), and domain term preservation.
@@ -73,7 +89,7 @@ Verifies output structure: question line before bullets, interpersonal before di
 | Major | 2x | Goal tracking, forward-looking, interpersonal accuracy |
 | Minor | 1x | Template compliance, latency |
 
-**Stability**: Structural consistency across 3 runs — bullet count variance and keyword overlap (Jaccard similarity).
+**Stability**: Structural consistency across 5 runs — bullet count variance and keyword overlap (Jaccard similarity).
 
 ## Assertion Types
 
@@ -95,6 +111,10 @@ Semantic evaluation where interpretation is required:
 | Due Dates Grounded | Every due date maps to a time reference in the transcript |
 | Action Items Stable | Previous items preserved unless transcript supersedes; no duplicates |
 | Question Detection | Only unanswered remote questions surfaced; user's own questions excluded |
+| Interview Depth | Follow-ups probe vague claims, test technical depth, or dig into behavioral specifics |
+| Blocker Ownership | Unowned blockers and stalled handoffs flagged; owned items not falsely flagged |
+| Workaround Detection | Workarounds and unexpressed needs surfaced; cost/frequency explored |
+| Presentation Coverage | Uncovered prepared points surfaced; covered points not re-surfaced |
 
 ## Results
 
