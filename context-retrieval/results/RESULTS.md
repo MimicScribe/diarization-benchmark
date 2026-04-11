@@ -87,6 +87,18 @@ Five scenarios test situations where loaded reference documents could produce in
 
 4. **Injection**: Retrieved chunks are formatted as reference context in the briefing prompt. The system instruction tells the model to use reference facts to enrich talking points — not to introduce unrelated topics or reassign facts between entities.
 
+## Known Failures
+
+4 of 77 assertions failed. These are the specific cases where the system produced incorrect or unhelpful output.
+
+**SEC filing — competitor names not surfaced.** A board meeting scenario loaded a 10-K filing with competitor analysis. The briefing output contained no specific facts from the reference context. Competitor names (Tableau, Looker, Domo) present in the filing were not mentioned despite being relevant to the discussion. The retrieval layer returned correct chunks, but the LLM did not incorporate them into the talking points.
+
+**Noisy transcript — misattributed data residency.** A scenario with realistic ASR noise (filler words, false starts) caused the LLM to conflate two separate reference items. A US data residency confirmation was misattributed to the wrong product tier.
+
+**Similar entity names — number leaked across entities.** Two products with similar names were discussed. A $3,200/month figure from one product was implicitly applied to the competing product (Workato/Tray.io) in the output, violating entity separation.
+
+**Dense document — unrelated details leaked.** A large, dense document was loaded and the conversation touched only one topic (hiring/attrition). The output included a percentage figure from an unrelated section of the same document, failing the "focused, not flooded" assertion.
+
 ## Benchmark vs Production
 
 **Transcripts match ASR output.** All benchmark transcripts use lowercase text without punctuation, matching the style produced by the on-device speech-to-text pipeline after filler word removal and inverse text normalization.
