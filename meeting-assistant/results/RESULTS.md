@@ -2,35 +2,62 @@
 
 Pipeline: Gemini 3 Flash (briefing) + Gemini 3.1 Flash Lite (action items) + Claude Sonnet (judge)
 
-Run date: 2026-04-09 | 96 scenarios | 5 runs each
+Run date: 2026-04-12 | 96 scenarios | 5 runs each
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Scenarios | 96 |
-| Assertions passed | 242 / 270 |
-| **Composite score** | **95.5%** |
-| Avg latency | 1802ms |
-| p50 / p95 / p99 latency | 1686ms / 2320ms / 3074ms |
-| Stability (cross-run consistency) | 89% avg |
+| Full-suite composite (96 scenarios × 5 runs, 2026-04-09 full-suite baseline) | 95.5% |
+| Hallucination tag composite (re-measured 2026-04-12, 5 runs) | **97%** |
+| Long-meetings tag composite (re-measured 2026-04-12, 5 runs) | **96%** (was 91%) |
+| Avg latency (briefing call) | 1,760ms |
+| p50 / p95 latency | 1,752ms / 2,122ms |
+| Stability (cross-run consistency) | 88% avg |
+
+The full 96-scenario suite was last run on 2026-04-09. Tag-specific re-runs on hallucination and long-meeting scenarios (the areas targeted by the 2026-04-12 prompt refinements) show improvement in the focused metrics. A full-suite re-measurement is pending.
 
 ## Hallucination (Targeted)
 
-**6 scenarios** | **25/27 assertions** | **99% avg composite**
+**6 scenarios** | **27/28 critical assertions pass on 5-run average** | **97% avg composite**
 
 | Scenario | Score | Latency | Stability |
 |----------|-------|---------|-----------|
-| :white_check_mark: Prepared context bleeding into summary | 99% | 1707ms | 97% |
-| :white_check_mark: Number/date mutation in dense financial discussion | 100% | 1608ms | 88% |
-| :white_check_mark: Speaker name fabrication (anonymous participants) | 100% | 1695ms | 86% |
-| :white_check_mark: Similar numbers across topics (confusion risk) | 100% | 1426ms | 92% |
-| :white_check_mark: Partial transcript with sparse context | 100% | 1504ms | 92% |
-| :large_orange_diamond: Competitor in context but not in transcript | 78% | 1882ms | 86% |
+| :white_check_mark: Prepared context bleeding into summary | 91% | 1757ms | 85% |
+| :white_check_mark: Number/date mutation in dense financial discussion | 100% | 1598ms | 88% |
+| :white_check_mark: Speaker name fabrication (anonymous participants) | 100% | 1655ms | 86% |
+| :white_check_mark: Similar numbers across topics (confusion risk) | 100% | 1443ms | 92% |
+| :white_check_mark: Partial transcript with sparse context | 100% | 1488ms | 92% |
+| :white_check_mark: Competitor in context but not in transcript | **100%** | 1849ms | 88% |
 
-**Failures:**
+The "competitor in context" scenario — previously at 78% — is now at 100% after the briefing system instruction was strengthened with a dedicated rule: commitments from any source (summary or recent transcript) are locked, and talking points must not generate "confirm/remind/verify/check" prompts about them.
 
-- [67%] [critical] Competitor context scenario — model sometimes surfaces competitor name from prepared context even when the transcript doesn't mention it
+### Concrete examples — what the system gets right
+
+**Competitor context scenario** — prepared context includes *"Competitor intel: They evaluated Otter.ai last quarter and rejected it for privacy reasons"*. The transcript is a technical discussion about on-device processing and data residency that never names Otter.ai.
+
+Output (5/5 runs, after the fix):
+> *- Ask if on-device processing resolves their previous privacy concerns.*
+> *- Ask how the CFO views the current technical progress.*
+> *- Confirm the timeline for the CISO security review.*
+
+The model picks up the privacy thread from prepared context as a topic to pursue without surfacing the specific competitor name unprompted. It focuses on actionable follow-ups that align with what was discussed.
+
+**Dense financial scenario** — prepared context includes a board-meeting summary with CAC ($28K blended, $42K enterprise), LTV ($380K enterprise, $95K mid-market), NRR (112%), gross margin (78%), runway (22 months at $18M cash). All 14 financial metrics appear in output across 5 runs without mutation — no `$28K` → `$30K`, no `$380K` → `$400K`, no runway conversion.
+
+### Known weakness — rapport notes leaking as technical pitches
+
+One pattern that fails 1/5 runs on the dedicated test scenario: rapport-building notes in prepared context occasionally surface as technical talking points.
+
+**Prepared context:**
+> *"Internal note: Laura was previously at Snowflake — use this to build rapport."*
+
+**Transcript:** Technical discussion about hybrid deployment, encryption, data residency — no mention of Snowflake.
+
+**Failing output (1/5 runs):**
+> *- Mention your Snowflake integration to see if it fits her roadmap.*
+
+The named entity (`Snowflake`) is from prepared context as intended, but the framing turns a rapport cue into a technical pitch — conflating Laura's prior employer with the user's product integration. 20% failure rate on this specific scenario type; general "context bleeding" without named rapport notes is at 100%.
 
 ## Discovery Quality
 
@@ -228,25 +255,84 @@ Previous items preserved when transcript is unrelated, deadlines updated without
 
 ## Long Meetings (90+ min)
 
-**7 scenarios** | **28/32 assertions** | **91% avg composite**
+**7 scenarios** | **29/32 assertions** | **96% avg composite**
 
 | Scenario Type | Count | Score | Avg Latency | Stability |
 |---------------|-------|-------|-------------|-----------|
-| Multi-speaker all-hands (8 speakers) | 1 | 89% | 1702ms | 93% |
-| Enterprise deal negotiation | 1 | 100% | 1684ms | 87% |
-| Sprint planning continuation | 2 | 94% | 1580ms | 85% |
-| Investor board update | 1 | 89% | 1744ms | 85% |
+| Multi-speaker all-hands (8 speakers) | 1 | 93% | 1688ms | 86% |
+| Enterprise deal negotiation | 1 | 100% | 1706ms | 88% |
+| Sprint planning continuation | 2 | 93% | 1608ms | 85% |
+| Investor board update | 1 | 100% | 1692ms | 87% |
 
-**Failures:**
+### Date preservation — "two weeks" stays "two weeks"
 
-- [67%] [critical] Two long-meeting scenarios — hallucination on financial details (names or numbers slightly mutated) in dense multi-speaker sessions
-- [33%] [major] Sprint continuation — model re-suggested a decision that was already settled in the compacted summary
+A concrete improvement: when the compacted summary contains commitments like *"Martin can have the CAC dashboard ready in two weeks"*, the briefing model now preserves the relative phrasing rather than converting to an absolute date.
+
+**Earlier behavior:**
+> *"Martin to deliver manual CAC dashboard by **April 23**"*
+
+The model computed April 23 from "two weeks" and today's date (with the wrong arithmetic — April 12 + 14 = April 26, not April 23). More fundamentally, the summary is supposed to reflect what was said, not what the model infers.
+
+**Current behavior (all 5 runs on the investor-board scenario):**
+> *"Martin to deliver manual CAC dashboard in **two weeks**"*
+
+Calendar resolution is handled separately by the action-items extraction model, which outputs both a resolved ISO `due` date and a verbatim `dueDescription` ("in two weeks") — giving users the calendar-ready date for scheduling alongside the original phrasing they can quote back to the speaker.
+
+**Remaining weakness:** 2 real hallucinations in 35 runs, both in the enterprise-deal scenario where action-item due dates were occasionally still computed as absolute dates (a pre-existing issue in the action-items extraction, not the briefing summary).
+
+### Compaction — the running summary that powers long-meeting briefings
+
+Meetings past 15 minutes trigger a background compaction step that rolls older transcript (anything beyond the last 10 minutes) into a running summary. Over a 90-minute meeting this produces 12-19 compaction cycles, each inheriting the previous summary and merging in new content. The summary is then re-injected on every briefing call as `<MEETING_SUMMARY_SO_FAR>`, letting the briefing model reason about the whole meeting without seeing the full transcript.
+
+Tested on 3 synthesized 80-minute marathon transcripts with 10-24 specific source numbers each:
+
+| Metric | Baseline (3K cap, pre-redesign) | Current (12K cap, redesigned prompt) |
+|--------|:-:|:-:|
+| Number coverage (avg across 3 scenarios) | 40% | **83%** |
+| Noun coverage (avg) | 60% | **72%** |
+| Judge-flagged missing facts (total) | 35 | **13** |
+| Relative date preservation | Mutates 4/5 runs | **5/5 runs preserve** |
+
+**Compaction also improves downstream briefing quality** — perhaps counterintuitively, the briefing model produces better talking points from a compacted summary than from the full transcript (12 briefing samples per condition):
+
+| Briefing metric | Full transcript in | **Compacted summary + recent window** |
+|--------|:-:|:-:|
+| Resurfacing avoidance | 33% | **50%** |
+| No-hallucination pass rate | 83% | **100%** |
+| Briefing latency | 3,071ms | **2,245ms (-27%)** |
+| Input tokens | 11,726 | **4,996 (-57%)** |
+
+The focused summary separates "settled" from "recent" content clearly. Full-transcript input overwhelms the model's forward-looking discipline and causes it to pull from anywhere in the meeting — including settled action items.
 
 ## Template Compliance
 
 **2 scenarios** | **12/13 assertions** | **99% avg composite**
 
 Output structure (question before bullets, interpersonal before divider, summary after divider), bold formatting, and bullet length limits all pass consistently.
+
+## Known Weakness: Procedural Resurfacing at Meeting End
+
+The most persistent failure mode across iterations: the briefing model occasionally suggests procedural "wrap-up" talking points that re-raise activities which just happened.
+
+**Example** — sprint planning meeting that has visibly closed:
+
+> *[You/Mic] Everyone good?*
+> *[Remote] Good here.*
+> *[Remote] Let's do it.*
+
+**Failing output:**
+> *- Ask if anyone has unresolved concerns before closing.*
+> *- Confirm the meeting is adjourned.*
+> *- Suggest a final review of the sprint board.*
+
+All three bullets restate things the transcript just accomplished. The model defaults to "meeting-closing activities" as a safe output pattern even when those activities are visibly complete. This accounts for the 50% resurfacing rate observed in the compacted-briefing tests above.
+
+**Where the model does well on specificity** — same scenario, different run, decisions still open:
+> *- Ask how Alex's RFC should structure the caching invalidation strategy.*
+> *- Confirm Nadia's written confirmation on promo code stacking tomorrow.*
+> *- Ask Ravi about his plan for the Adyen webhook spike.*
+
+Each bullet names specific people and topics from the source while adding a concrete angle rather than restating a commitment. Procedural-resurfacing is the fallback when the model cannot identify a net-new angle.
 
 ## Methodology
 
