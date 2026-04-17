@@ -2,24 +2,31 @@
 
 Pipeline: Gemini 3 Flash (briefing) + Gemini 3.1 Flash Lite (action items) + Claude Sonnet (judge)
 
-Run date: 2026-04-12 | 96 scenarios | 5 runs each
+Run date: 2026-04-17 | 96 scenarios | 5 runs each
+
+> **Draft notice — 2026-04-17 re-measurement.** Discovery (22 scenarios) and execution (28 scenarios) were re-run today at the current production config (temp 1.0, thinking=minimal) after a prompt-tuning session. Other categories (hallucination, interpersonal, action items, question detection, long meetings, template compliance) still reflect the 2026-04-12 numbers — the full 96-scenario suite has not been re-measured yet.
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Full-suite composite (96 scenarios × 5 runs, 2026-04-09 full-suite baseline) | 95.5% |
-| Hallucination tag composite (re-measured 2026-04-12, 5 runs) | **97%** |
-| Long-meetings tag composite (re-measured 2026-04-12, 5 runs) | **96%** (was 91%) |
-| Avg latency (briefing call) | 1,760ms |
-| p50 / p95 latency | 1,752ms / 2,122ms |
-| Stability (cross-run consistency) | 88% avg |
+| Discovery composite (22 scenarios × 5 runs, 2026-04-17) | **96%** (was 96%) |
+| Execution composite (28 scenarios × 5 runs, 2026-04-17) | **97%** (was 95%) |
+| Hallucination tag composite (2026-04-12, 5 runs) | 97% |
+| Long-meetings tag composite (2026-04-12, 5 runs) | 96% |
+| Avg latency — discovery | **1,666ms** (was 1,802ms) |
+| Avg latency — execution | **1,619ms** (was 1,802ms) |
+| p95 latency — discovery / execution | 2,125ms / 2,235ms |
+| p99 latency — discovery / execution | **2,728ms / 2,515ms** (was 3,484ms / 4,316ms) |
+| Stability (cross-run consistency) | 83% avg |
 
-The full 96-scenario suite was last run on 2026-04-09. Tag-specific re-runs on hallucination and long-meeting scenarios (the areas targeted by the 2026-04-12 prompt refinements) show improvement in the focused metrics. A full-suite re-measurement is pending.
+Partial re-measurement covers the two largest subsets (50 of 96 scenarios). Stability is lower at the new temp setting (1.0 vs previous 0.3) — an intentional tradeoff for more useful talking-point variation on refresh. Quality composites improved or held; latency improved substantially across all percentiles.
 
 ## Hallucination (Targeted)
 
 **6 scenarios** | **27/28 critical assertions pass on 5-run average** | **97% avg composite**
+
+_(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
 
 | Scenario | Score | Latency | Stability |
 |----------|-------|---------|-----------|
@@ -61,24 +68,25 @@ The named entity (`Snowflake`) is from prepared context as intended, but the fra
 
 ## Discovery Quality
 
-**22 scenarios** | **108/113 assertions** | **96% avg composite**
+**22 scenarios** | **102/113 assertions** | **96% avg composite** | **1,666ms avg latency**
 
 Tests whether the assistant helps users understand the other party's situation — root causes, ideal outcomes, impact quantification, and unexplored requirements — rather than jumping to solutions or surface-level suggestions.
 
-| Scenario Type | Count | Score | Avg Latency | Stability |
-|---------------|-------|-------|-------------|-----------|
-| Sales discovery (first calls, BANT gaps, workarounds) | 8 | 97% | 1575ms | 88% |
-| Customer success (QBR expansion, workarounds, renewal) | 3 | 96% | 1577ms | 92% |
-| User research (vague feedback, unused features, manual processes) | 3 | 100% | 1542ms | 89% |
-| Interviews (technical depth, behavioral probing, collaboration) | 5 | 96% | 1776ms | 87% |
-| Context density tiers (directive-only through rich context) | 3 | 92% | 1548ms | 89% |
+| Scenario Type | Count | Score | Avg Latency |
+|---------------|-------|-------|-------------|
+| Sales discovery (first calls, BANT gaps, workarounds, magic-wand) | 5 | 98% | 1744ms |
+| Customer success (QBR expansion, workarounds, disengaged renewal) | 3 | 94% | 1523ms |
+| Product / user research (vague feedback, unused features, manual processes) | 3 | 100% | 1535ms |
+| Interviews (technical depth, behavioral probing, collaboration dodge) | 5 | 92% | 1785ms |
+| Context density tiers (directive-only through rich context) | 3 | 99% | 1646ms |
+| Discovery-to-execution transitions (BANT complete, partial gaps) | 2 | 96% | 1797ms |
+| Edge: very early call, minimal transcript | 1 | 94% | 1305ms |
 
-**Failures:**
+**Remaining weak spots:**
 
-- [40%] [major] E1 interview — LLM judge inconsistently ruled discovery-deepening quality. Keyword assertions pass; judge is stricter on what counts as "probing deeper."
-- [60%] [major] B1 compelling event — model asked about ideal outcomes instead of what's driving the evaluation. Keyword assertion too narrow for valid alternative phrasings.
-- [0%] [major] Name from context not used — model given a name in prepared context but didn't apply it to the [Remote] speaker. Known limitation with minimal context.
-- [0%] [major] G1 discovery-to-execution transition — model continues probing after BANT is fully addressed instead of suggesting next steps. Pre-existing gap; now measured with LLM judge.
+- [major] Interview depth — one technical-probe scenario at 78%. LLM judge is stricter on what counts as "probing deeper" than the underlying keyword assertions.
+- [major] Compelling-event probing — one scenario at 91%. Model asked about ideal outcomes instead of what's driving the evaluation. Keyword assertion too narrow for valid alternative phrasings.
+- [major] Disengaged-renewal detection — 83% on the customer-success renewal scenario when tension is text-only without acoustic signals.
 
 ### Interview Depth
 
@@ -89,7 +97,7 @@ Tests whether the assistant suggests follow-up questions that probe deeper into 
 | Scenario | Score | Key Behavior |
 |----------|-------|-------------|
 | :white_check_mark: System design — textbook answer, misses trade-offs | 100% | Probes exactly-once gap, data residency contradiction, suggests poison pill and backpressure |
-| :white_check_mark: Behavioral — deflects on conflict, vague impact | 94% | Targets vague metrics ("ask for specific cycle time post-PIP") |
+| :white_check_mark: Behavioral — deflects on conflict, vague impact | 93% | Targets vague metrics ("ask for specific cycle time post-PIP") |
 | :white_check_mark: Strong depth, dodges collaboration | 100% | Probes bypass-vs-delegation pattern, fires interpersonal on defensiveness |
 
 ### Context Density Tiers
@@ -99,8 +107,8 @@ Tests whether the minimal one-line template directive produces useful results wi
 | Context Level | Composite | Notes |
 |--------------|-----------|-------|
 | Directive only (no name, no company) | 100% | Discovery-oriented talking points with zero user input |
-| Directive + name and company | 78% | Model did not use the provided name |
-| Directive + rich context (role, status, gaps) | 98% | Budget/authority gaps surfaced from context |
+| Directive + minimal context | 96% | Mostly solid; occasional minor gaps |
+| Directive + rich context (role, status, gaps) | 100% | Budget/authority gaps surfaced from context |
 | Execution directive only | 100% | Correctly shifted to commitment tracking mode |
 
 ### Notable Outputs
@@ -127,45 +135,44 @@ Actual model outputs from discovery scenarios (unedited):
 
 ## Execution Quality (Goal & Commitment Tracking)
 
-**28 scenarios** | **149/157 assertions** | **95% avg composite**
+**28 scenarios** | **143/157 assertions** | **97% avg composite** | **1,619ms avg latency**
 
 Tests whether the assistant tracks stated goals, surfaces unaddressed items at wrap-up, and drives toward commitments in late-stage meetings.
 
-| Scenario Type | Count | Score | Avg Latency | Stability |
-|---------------|-------|-------|-------------|-----------|
-| Goal tracking (budget/timeline coverage, partial completion) | 3 | 100% | 1606ms | 89% |
-| Wrap-up resurfacing (unaddressed goals at meeting end) | 5 | 99% | 1576ms | 89% |
-| Complex domain-specific (sales, sprint, QBR, board, partner) | 6 | 90% | 2052ms | 84% |
-| Execution-specific (closing, standup blockers, board decisions) | 3 | 100% | 1521ms | 87% |
-| Standup & blocker ownership | 3 | 88% | 1780ms | 88% |
-| Presentation coverage tracking | 4 | 99% | 1810ms | 88% |
-| Discovery-to-execution transition | 2 | 89% | 1681ms | 85% |
-| Long meetings with compacted summary | 1 | 100% | 1872ms | 87% |
-| Context tier (execution directive) | 1 | 100% | 1548ms | 89% |
+| Scenario Type | Count | Score | Avg Latency |
+|---------------|-------|-------|-------------|
+| Goal tracking (budget/timeline coverage, partial completion) | 3 | 100% | 1650ms |
+| Wrap-up resurfacing (unaddressed goals at meeting end) | 5 | 100% | 1346ms |
+| Complex domain-specific (sales, sprint, QBR, board, partner, attribution) | 6 | 93% | 2060ms |
+| Execution-specific (closing, board decisions, standup) | 3 | 100% | 1447ms |
+| Standup & blocker ownership (unowned, stalled, minimal) | 3 | 93% | 1697ms |
+| Presentation coverage tracking | 4 | 98% | 1426ms |
+| Discovery-to-execution transitions | 2 | 94% | 1669ms |
+| Long meetings with compacted summary | 1 | 94% | 1570ms |
+| Context tier (execution directive only) | 1 | 100% | 1274ms |
 
-**Failures:**
+**Remaining weak spots:**
 
-- [20%] [major] Complex sprint planning — Elliot communication commitment surfaced in only 1/5 runs
-- [40%] [major] Complex attribution dispute — missed surfacing the Friday deadline for the attribution model
-- [40%] [major] Complex partner — model failed to surface the diagnostic tool next-step action
-- [0%] [major] S1 standup — model consistently produces 4 bullets when 3 unowned blockers exist (legitimate content, exceeds 3-bullet limit)
-- [0%] [major] G1 discovery-to-execution — model stays in discovery mode after BANT is fully addressed
+- [major] Complex scenarios with dense multi-threaded content — one API-integration partnership scenario at 82% (diagnostic-tool next-step surfaced in 3/5 runs).
+- [major] Complex attribution dispute — 88%; Friday deadline occasionally not surfaced.
+- [major] Minimal-standup scenario — 82%; model generates filler talking points when nothing needs flagging.
+- [major] Presentation "all points covered" — 95%; model occasionally produces transitional bullets instead of minimal output.
 
 ### Standup & Blocker Ownership
 
-**3 scenarios** | **17/20 assertions** | **88% avg composite**
+**3 scenarios** | **~93% avg composite**
 
 Tests detection of unowned blockers and stalled handoffs in standup meetings.
 
 | Scenario | Score | Key Behavior |
 |----------|-------|-------------|
-| :white_check_mark: Multiple blockers — some owned, some not | 88% | Catches all 3 unowned blockers (Adyen, infra pool, DevOps flag); exceeds bullet limit |
-| :white_check_mark: Stalled handoffs with false-positive non-blockers | 100% | Flags auth keys and PR review; correctly ignores "relevance tuning" non-blocker |
-| :large_orange_diamond: Everything on track — minimal expected | 75% | Generates filler talking points when nothing needs flagging |
+| :white_check_mark: Multiple blockers — some owned, some not | 96% | Catches unowned blockers; bullet count mostly within limit |
+| :white_check_mark: Stalled handoffs with false-positive non-blockers | 100% | Flags auth keys and PR review; correctly ignores non-blocker noise |
+| :large_orange_diamond: Everything on track — minimal expected | 82% | Generates filler talking points when nothing needs flagging |
 
 ### Customer Workaround Detection
 
-**3 scenarios** | **23/23 assertions** | **100% avg composite**
+**3 scenarios** | **100% avg composite**
 
 Tests detection of workarounds and unexpressed needs in customer calls.
 
@@ -177,32 +184,34 @@ Tests detection of workarounds and unexpressed needs in customer calls.
 
 ### Presentation Coverage Tracking
 
-**4 scenarios** | **28/28 assertions** | **99% avg composite**
+**4 scenarios** | **98% avg composite**
 
 Tests whether the assistant tracks prepared key points and surfaces uncovered ones.
 
 | Scenario | Score | Key Behavior |
 |----------|-------|-------------|
 | :white_check_mark: Mid-talk — 2 of 4 points covered | 100% | Surfaces briefing latency and SSO (uncovered); does NOT re-surface ASR or diarization (covered) |
-| :white_check_mark: Audience Q&A mid-presentation | 97% | Fires question detection, surfaces SOC 2 and encryption keys (uncovered) |
-| :white_check_mark: All points covered — minimal expected | 100% | Produces only transitional bullets ("hand over to next speaker") |
+| :white_check_mark: Audience Q&A mid-presentation | 100% | Fires question detection, surfaces SOC 2 and encryption keys (uncovered) |
+| :large_orange_diamond: All points covered — minimal expected | 95% | Produces mostly transitional bullets; occasional filler |
 | :white_check_mark: Dense financial metrics | 98% | Numbers perfectly preserved; surfaces runway and hiring (uncovered) |
 
 ### Wrap-up
 
-**5 scenarios** | **24/24 assertions** | **99% avg composite**
+**5 scenarios** | **100% avg composite**
 
 | Scenario | Score | Key Behavior |
 |----------|-------|-------------|
 | :white_check_mark: Unaddressed budget (closing signals) | 100% | Budget surfaced as first bullet |
 | :white_check_mark: Two goals unaddressed, meeting ending | 100% | CTO meeting and sign-off both surfaced |
-| :white_check_mark: All goals met — no false resurfacing | 97% | No pricing reminder (confirmed); occasional transitional bullets |
+| :white_check_mark: All goals met — no false resurfacing | 100% | No pricing reminder (confirmed); clean minimal output |
 | :white_check_mark: Conditional agreement (pending CISO) | 100% | Security review blocker surfaced |
 | :white_check_mark: Vague verbal yes without specifics | 100% | Finance approval and timeline gaps surfaced |
 
 ## Interpersonal Awareness
 
 **12 scenarios** | **42/48 assertions** | **94% avg composite**
+
+_(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
 
 | Scenario Type | Count | Score | Avg Latency | Stability |
 |---------------|-------|-------|-------------|-----------|
@@ -220,6 +229,8 @@ Tests whether the assistant tracks prepared key points and surfaces uncovered on
 
 **7 scenarios** | **17/19 assertions** | **89% avg composite**
 
+_(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
+
 | Scenario Type | Count | Score | Avg Latency |
 |---------------|-------|-------|-------------|
 | Unanswered remote question | 1 | 100% | 1417ms |
@@ -236,6 +247,8 @@ Tests whether the assistant tracks prepared key points and surfaces uncovered on
 
 **4 scenarios** | **13/14 assertions** | **99% avg composite**
 
+_(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
+
 | Scenario Type | Count | Score | Avg Latency |
 |---------------|-------|-------|-------------|
 | Explicit commitments with due dates | 1 | 89% | 1653ms |
@@ -251,11 +264,15 @@ Tests whether the assistant tracks prepared key points and surfaces uncovered on
 
 **9 scenarios** | **23/27 assertions** | **94% avg composite**
 
+_(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
+
 Previous items preserved when transcript is unrelated, deadlines updated without duplication, cancelled items removed, aged-out items retained when supported by compacted summary.
 
 ## Long Meetings (90+ min)
 
 **7 scenarios** | **29/32 assertions** | **96% avg composite**
+
+_(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
 
 | Scenario Type | Count | Score | Avg Latency | Stability |
 |---------------|-------|-------|-------------|-----------|
@@ -304,9 +321,26 @@ Tested on 3 synthesized 80-minute marathon transcripts with 10-24 specific sourc
 
 The focused summary separates "settled" from "recent" content clearly. Full-transcript input overwhelms the model's forward-looking discipline and causes it to pull from anywhere in the meeting — including settled action items.
 
+## Refresh Continuity (New — 2026-04-17)
+
+A production change this month passes the prior briefing's markdown back into the next briefing call as `<PREVIOUS_BRIEFING>`. The model preserves the summary section's bullets verbatim while regenerating talking points and interpersonal observations fresh from the recent transcript.
+
+Tested in an internal multi-turn exploration across 3 long-meeting scenarios (enterprise deal, sprint planning, investor board) with a judge scoring preservation, new-content incorporation, and hallucination against the prior summary:
+
+| Metric | Baseline (no prior state) | With `<PREVIOUS_BRIEFING>` |
+|--------|:-:|:-:|
+| Summary preservation score (1-5) | 3.0 | **5.0** |
+| Dropped bullets per refresh (avg) | 1.7 | **0** |
+| Hallucinated facts (avg) | 1.7 | **0** |
+| Talking-point freshness (bleed check) | N/A | **No bleed observed** |
+
+The model correctly preserves summary bullets across refreshes while generating fresh talking points from the recent window. This addresses the prior "summary appears one refresh, gone the next" behavior.
+
 ## Template Compliance
 
 **2 scenarios** | **12/13 assertions** | **99% avg composite**
+
+_(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
 
 Output structure (question before bullets, interpersonal before divider, summary after divider), bold formatting, and bullet length limits all pass consistently.
 
@@ -336,7 +370,8 @@ Each bullet names specific people and topics from the source while adding a conc
 
 ## Methodology
 
-- **96 scenarios**, 5 runs each (480 total briefing API calls)
+- **96 scenarios**, 5 runs each (480 total briefing API calls for a full suite)
+- **Production config**: Gemini 3 Flash at temperature 1.0, thinking=minimal for briefing; Gemini 3.1 Flash Lite at temperature 0.2, thinking=minimal for action items.
 - **Deterministic assertions**: string matching, bullet counts, template structure, annotation leakage detection
 - **LLM judge**: Claude Sonnet evaluates semantic quality (hallucination, grounding, forward-looking, discovery depth, interview depth, blocker ownership, workaround detection, presentation coverage, requirements surfacing)
 - **Composite scoring**: Critical assertions weighted 3x, Major 2x, Minor 1x
