@@ -2,25 +2,35 @@
 
 Pipeline: Gemini 3 Flash (briefing) + Gemini 3.1 Flash Lite (action items) + Claude Sonnet (judge)
 
-Run date: 2026-04-17 | 96 scenarios | 5 runs each
+Run date: 2026-04-18 | 96 scenarios | 5 runs each
 
-> **Draft notice — 2026-04-17 re-measurement.** Discovery (22 scenarios) and execution (28 scenarios) were re-run today at the current production config (temp 1.0, thinking=minimal) after a prompt-tuning session. Other categories (hallucination, interpersonal, action items, question detection, long meetings, template compliance) still reflect the 2026-04-12 numbers — the full 96-scenario suite has not been re-measured yet.
+> **Partial re-measurement — 2026-04-18.** Discovery (22 scenarios) and execution (28 scenarios) were re-run at the current production config (temp 1.0, thinking=minimal) after a prompt-validation session where we A/B-tested three candidate prompt additions. Two candidates regressed quality and were dropped; one (softened `<PREVIOUS_BRIEFING>` instruction for the briefing call) was kept for its latency wins. Other categories (hallucination, interpersonal, action items, question detection, long meetings, template compliance) still reflect the 2026-04-12 numbers.
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Discovery composite (22 scenarios × 5 runs, 2026-04-17) | **96%** (was 96%) |
-| Execution composite (28 scenarios × 5 runs, 2026-04-17) | **97%** (was 95%) |
+| Discovery composite (22 scenarios × 5 runs, 2026-04-18) | **96%** |
+| Execution composite (28 scenarios × 5 runs, 2026-04-18) | **97%** |
 | Hallucination tag composite (2026-04-12, 5 runs) | 97% |
 | Long-meetings tag composite (2026-04-12, 5 runs) | 96% |
-| Avg latency — discovery | **1,666ms** (was 1,802ms) |
-| Avg latency — execution | **1,619ms** (was 1,802ms) |
-| p95 latency — discovery / execution | 2,125ms / 2,235ms |
-| p99 latency — discovery / execution | **2,728ms / 2,515ms** (was 3,484ms / 4,316ms) |
-| Stability (cross-run consistency) | 83% avg |
+| Avg latency — discovery | **1,513ms** (was 1,666ms on 2026-04-17, 1,802ms on 2026-04-09) |
+| Avg latency — execution | **1,520ms** (was 1,619ms on 2026-04-17, 1,802ms on 2026-04-09) |
+| p95 latency — discovery / execution | 1,844ms / 1,984ms |
+| p99 latency — discovery / execution | **1,998ms / 2,247ms** (was 2,728ms / 2,515ms on 2026-04-17) |
+| Stability (cross-run consistency) | 82% avg |
 
-Partial re-measurement covers the two largest subsets (50 of 96 scenarios). Stability is lower at the new temp setting (1.0 vs previous 0.3) — an intentional tradeoff for more useful talking-point variation on refresh. Quality composites improved or held; latency improved substantially across all percentiles.
+Partial re-measurement covers the two largest subsets (50 of 96 scenarios). Latency improved substantially after softening the `<PREVIOUS_BRIEFING>` instruction to a shorter anti-flicker + recency-focused form — p99 dropped ~730ms on discovery and ~268ms on execution vs the stricter instruction from 2026-04-17. Stability is lower at production temperature (1.0) than the previously-hardcoded benchmark temperature (0.3) — an intentional tradeoff for useful talking-point variation on refresh.
+
+## Prompt validation — what we tried and what stuck
+
+This measurement cycle A/B-tested three candidate prompt additions. Principle: every instruction must justify its place — if it doesn't measurably improve quality, it's dropped to save tokens and latency.
+
+| Candidate | Result | Decision |
+|-----------|--------|----------|
+| End-of-meeting summary "capture every substantive decision, commitment, number, named entity, deadline, unresolved question" (comprehensiveness) | template-summaries exact match 100% → 85% (-14.8pp), section recall 100% → 83.7%, usefulness 4.66 → 4.17, routing 0.849 → 0.759. summary-sections exact match 79.5% → 74.4%, routing 0.564 → 0.436. | **Dropped.** The instruction caused over-packing and misrouting. |
+| End-of-meeting summary "separate sections with blank lines so RAG splits cleanly" (section formatting) | Measurement on 53 pre-change outputs: 100% already had blank-line separators without being told. Post-change: still 100%. | **Dropped.** Model already did it naturally. Instruction was dead weight. |
+| Briefing `<PREVIOUS_BRIEFING>` softened from "preserve bullets verbatim, append new" to "emit summary if prior had one, focus on recent, replace superseded bullets" | Composite tied (-0.1pp both subsets). Latency p99 improved 730ms (discovery) / 268ms (execution). Shorter instruction → fewer tokens → faster. | **Kept.** No quality cost, latency win. |
 
 ## Hallucination (Targeted)
 
