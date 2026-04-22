@@ -2,7 +2,7 @@
 
 Pipeline: Gemini 3 Flash (briefing) + Gemini 3.1 Flash Lite (action items) + Claude Sonnet (judge)
 
-Run date: 2026-04-18 | 96 scenarios | 5 runs each
+Run date: 2026-04-18 (96-scenario suite) | 2026-04-22 (timezone subset, +7) | 103 scenarios total | 3–5 runs each
 
 > **Partial re-measurement — 2026-04-18.** Discovery (22 scenarios) and execution (28 scenarios) were re-run at the current production config (temp 1.0, thinking=minimal) after a prompt-validation session where we A/B-tested three candidate prompt additions. Two candidates regressed quality and were dropped; one (softened `<PREVIOUS_BRIEFING>` instruction for the briefing call) was kept for its latency wins. Other categories (hallucination, interpersonal, action items, question detection, long meetings, template compliance) still reflect the 2026-04-12 numbers.
 
@@ -277,6 +277,26 @@ _(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
 _(Last measured 2026-04-12 — numbers unchanged pending full-suite re-run.)_
 
 Previous items preserved when transcript is unrelated, deadlines updated without duplication, cancelled items removed, aged-out items retained when supported by compacted summary.
+
+## Timezone Resolution
+
+**7 scenarios** | **18/18 assertions** | **100% avg composite**
+
+_(Measured 2026-04-22 after the `dueTimezone` feature landed.)_
+
+Action items carry a `dueTimezone` field (IANA identifier or null). It's resolved from location cues attached to the item's owner — either in USER_CONTEXT prep notes ("Marty is East Coast") or in the transcript itself ("our London office", "by 2 PM Eastern"). When no cue is present for the owner, the field stays null rather than being guessed.
+
+| Scenario Type | Count | Score | Avg Latency | Stability |
+|---------------|-------|-------|-------------|-----------|
+| USER_CONTEXT cue → resolved zone | 1 | 100% | 1371ms | 82% |
+| Transcript cue → resolved zone | 1 | 100% | 1471ms | 78% |
+| No location cue → null (no spurious guess) | 1 | 100% | 1298ms | 82% |
+| Mixed: owner-scoped zones, user null + remote resolved | 1 | 100% | 1274ms | 79% |
+| Attribution: cue about non-committer must not spill over | 1 | 100% | 1437ms | 80% |
+| Multi-zone: three speakers, three zones, each independent | 1 | 100% | 1315ms | 87% |
+| Explicit zone in commitment speech (no inference needed) | 1 | 100% | 1246ms | 77% |
+
+Display downstream renders the primary time in the user's local zone and appends the speaker's clock when zones differ — so a deadline spoken at "2 PM Eastern" by a coworker lands on the user's screen as `11:00 AM PDT · 2:00 PM EDT`.
 
 ## Long Meetings (90+ min)
 
